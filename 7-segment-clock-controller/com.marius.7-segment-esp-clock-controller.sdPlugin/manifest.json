@@ -4,17 +4,17 @@
 	"Author": "Marius",
 	"Actions": [
 		{
-			"Name": "Counter",
-			"UUID": "com.marius.7-segment-clock-controller.increment",
-			"Icon": "imgs/actions/counter/icon",
-			"Tooltip": "Displays a count, which increments by one on press.",
-			"PropertyInspectorPath": "ui/increment-counter.html",
+			"Name": "Clock Controller",
+			"UUID": "com.marius.7-segment-esp-clock-controller.clock-control",
+			"Icon": "imgs/actions/clock/icon",
+			"Tooltip": "Controls the 7-segment clock display",
+			"PropertyInspectorPath": "ui/clock-controller.html",
 			"Controllers": [
 				"Keypad"
 			],
 			"States": [
 				{
-					"Image": "imgs/actions/counter/key",
+					"Image": "imgs/actions/clock/key",
 					"TitleAlignment": "middle"
 				}
 			]
@@ -43,5 +43,5 @@
 		"Version": "20",
 		"Debug": "enabled"
 	},
-	"UUID": "com.marius.7-segment-clock-controller"
+	"UUID": "com.marius.7-segment-esp-clock-controller"
 }

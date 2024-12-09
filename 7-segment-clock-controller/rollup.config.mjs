@@ -6,7 +6,7 @@ import path from "node:path";
 import url from "node:url";
 
 const isWatching = !!process.env.ROLLUP_WATCH;
-const sdPlugin = "com.marius.7-segment-clock-controller.sdPlugin";
+const sdPlugin = "com.marius.7-segment-esp-clock-controller.sdPlugin";
 
 /**
  * @type {import('rollup').RollupOptions}

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="144" height="144" version="1.1" viewBox="0 0 144 144" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background -->
+    <rect width="144" height="144" fill="#1a1a1a"/>
+    
+    <!-- Clock outline -->
+    <rect x="22" y="22" width="100" height="60" fill="none" stroke="#d8d8d8" stroke-width="4"/>
+    
+    <!-- 7-segment display segments (simplified) -->
+    <g fill="#d8d8d8">
+        <!-- Hours -->
+        <rect x="32" y="32" width="30" height="6" rx="2"/>
+        <rect x="32" y="49" width="30" height="6" rx="2"/>
+        <rect x="32" y="66" width="30" height="6" rx="2"/>
+        
+        <!-- Minutes -->
+        <rect x="82" y="32" width="30" height="6" rx="2"/>
+        <rect x="82" y="49" width="30" height="6" rx="2"/>
+        <rect x="82" y="66" width="30" height="6" rx="2"/>
+        
+        <!-- Colon -->
+        <circle cx="72" cy="42" r="3"/>
+        <circle cx="72" cy="62" r="3"/>
+    </g>
+    
+    <!-- RGB indicator -->
+    <g transform="translate(0, 95)">
+        <rect x="32" y="0" width="80" height="20" rx="4" fill="#2a2a2a"/>
+        <circle cx="52" cy="10" r="6" fill="#ff0000"/>
+        <circle cx="72" cy="10" r="6" fill="#00ff00"/>
+        <circle cx="92" cy="10" r="6" fill="#0000ff"/>
+    </g>
+</svg> 

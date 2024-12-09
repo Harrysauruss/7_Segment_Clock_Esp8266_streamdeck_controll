@@ -1,7 +1,7 @@
 {
     "scripts": {
         "build": "rollup -c",
-        "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.marius.7-segment-clock-controller\""
+        "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.marius.7-segment-esp-clock-controller\""
     },
     "type": "module",
     "devDependencies": {
