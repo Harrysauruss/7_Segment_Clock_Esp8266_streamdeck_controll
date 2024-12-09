@@ -1,0 +1,47 @@
+{
+	"Name": "7 Segment Clock Controller",
+	"Version": "0.1.0.0",
+	"Author": "Marius",
+	"Actions": [
+		{
+			"Name": "Counter",
+			"UUID": "com.marius.7-segment-clock-controller.increment",
+			"Icon": "imgs/actions/counter/icon",
+			"Tooltip": "Displays a count, which increments by one on press.",
+			"PropertyInspectorPath": "ui/increment-counter.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"States": [
+				{
+					"Image": "imgs/actions/counter/key",
+					"TitleAlignment": "middle"
+				}
+			]
+		}
+	],
+	"Category": "7 Segment Clock Controller",
+	"CategoryIcon": "imgs/plugin/category-icon",
+	"CodePath": "bin/plugin.js",
+	"Description": "controlls a 7 segment clock via an api calling an esp8266",
+	"Icon": "imgs/plugin/marketplace",
+	"SDKVersion": 2,
+	"Software": {
+		"MinimumVersion": "6.4"
+	},
+	"OS": [
+		{
+			"Platform": "mac",
+			"MinimumVersion": "10.15"
+		},
+		{
+			"Platform": "windows",
+			"MinimumVersion": "10"
+		}
+	],
+	"Nodejs": {
+		"Version": "20",
+		"Debug": "enabled"
+	},
+	"UUID": "com.marius.7-segment-clock-controller"
+}
