@@ -1,8 +1,7 @@
-import { action, KeyDownEvent, SingletonAction, WillAppearEvent, DidReceiveSettingsEvent, KeyAction } from "@elgato/streamdeck";
+import { action, KeyDownEvent, SingletonAction, WillAppearEvent, DidReceiveSettingsEvent } from "@elgato/streamdeck";
 
 type ClockSettings = {
     ipAddress?: string;
-    brightness?: number;
     color?: {
         r: number;
         g: number;
@@ -10,108 +9,88 @@ type ClockSettings = {
     };
 };
 
-type ClockStatus = {
-    configured: boolean;
-    brightness: number;
-    color: {
-        r: number;
-        g: number;
-        b: number;
-    };
-    currentHour: number;
-    currentMinute: number;
-    isTransitioning: boolean;
-};
-
 @action({ UUID: "com.marius.7-segment-esp-clock-controller.clock-control" })
 export class ClockController extends SingletonAction<ClockSettings> {
-    private status: ClockStatus | null = null;
-    private updateInterval: NodeJS.Timeout | null = null;
-
     override async onWillAppear(ev: WillAppearEvent<ClockSettings>): Promise<void> {
-        if (!('keyIndex' in ev.action)) return; // Only handle key actions
-        // Start periodic status updates
-        this.updateInterval = setInterval(() => this.updateStatus(ev.action as KeyAction<ClockSettings>), 5000);
-        await this.updateStatus(ev.action as KeyAction<ClockSettings>);
-    }
-
-    override onWillDisappear(): void {
-        if (this.updateInterval) {
-            clearInterval(this.updateInterval);
-            this.updateInterval = null;
-        }
+        await this.updatePreview(ev.payload.settings);
     }
 
     override async onKeyDown(ev: KeyDownEvent<ClockSettings>): Promise<void> {
-        const { ipAddress, brightness, color } = ev.payload.settings;
+        const { ipAddress, color = { r: 255, g: 0, b: 0 } } = ev.payload.settings;
+        
+        console.log('Settings:', { ipAddress, color });
         
         if (!ipAddress) {
+            console.log('No IP address configured');
             await ev.action.showAlert();
             return;
         }
 
         try {
-            const response = await fetch(`http://${ipAddress}/api/settings`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    brightness: brightness ?? 255,
-                    color: color ?? { r: 255, g: 0, b: 0 }
-                })
+            const url = `http://${ipAddress}/color?r=${color.r}&g=${color.g}&b=${color.b}`;
+            console.log('Calling URL:', url);
+
+            const response = await fetch(url, {
+                method: 'GET',
+                signal: AbortSignal.timeout(5000)
             });
+            
+            console.log('Response status:', response.status);
+            console.log('Response headers:', Object.fromEntries(response.headers));
+            
+            try {
+                const text = await response.text();
+                console.log('Response body:', text);
+            } catch (e) {
+                console.log('No response body or error reading it:', e);
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             await ev.action.showOk();
-            await this.updateStatus(ev.action);
+            await this.updatePreview(ev.payload.settings);
         } catch (error) {
-            console.error('Failed to update settings:', error);
+            console.error('Failed to update color:', error);
+            if (error instanceof Error) {
+                console.error('Error details:', {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack,
+                    cause: error.cause
+                });
+            }
             await ev.action.showAlert();
         }
     }
 
     override async onDidReceiveSettings(ev: DidReceiveSettingsEvent<ClockSettings>): Promise<void> {
-        if (!('keyIndex' in ev.action)) return; // Only handle key actions
-        await this.updateStatus(ev.action as KeyAction<ClockSettings>);
+        await this.updatePreview(ev.payload.settings);
     }
 
-    private async updateStatus(action: KeyAction<ClockSettings>): Promise<void> {
-        const settings = await action.getSettings();
-        const { ipAddress } = settings;
+    private async updatePreview(settings: ClockSettings): Promise<void> {
+        const { ipAddress, color = { r: 255, g: 0, b: 0 } } = settings;
+        
+        // Get the first action from the enumerable
+        const action = Array.from(this.actions)[0];
+        if (!action) return;
         
         if (!ipAddress) {
             await action.setTitle("No IP\nSet");
             return;
         }
 
-        try {
-            const response = await fetch(`http://${ipAddress}/api/status`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+        // Update the key's display
+        await action.setTitle(
+            `RGB:\n${color.r},${color.g},${color.b}`
+        );
 
-            this.status = await response.json() as ClockStatus;
-            
-            // Update the key's display
-            const { brightness, color } = this.status;
-            await action.setTitle(
-                `RGB: ${color.r},${color.g},${color.b}\nBright: ${brightness}`
-            );
-
-            // Create an SVG preview of the current color
-            const svg = `<svg width="72" height="72">
-                <rect width="72" height="72" fill="rgb(${color.r},${color.g},${color.b})" />
-            </svg>`;
-            
-            await action.setImage(`data:image/svg+xml,${encodeURIComponent(svg)}`);
-        } catch (error) {
-            console.error('Failed to fetch status:', error);
-            await action.setTitle("Error\nCheck IP");
-            await action.setImage(undefined); // Reset to default image
-        }
+        // Create an SVG preview of the current color
+        const svg = `<svg width="72" height="72">
+            <rect width="72" height="72" fill="rgb(${color.r},${color.g},${color.b})" />
+        </svg>`;
+        
+        await action.setImage(`data:image/svg+xml,${encodeURIComponent(svg)}`);
     }
 } 
