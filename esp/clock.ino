@@ -4,6 +4,7 @@
 #include <DNSServer.h>
 #include <EEPROM.h>
 #include <ArduinoJson.h>
+#include <WiFiManager.h> 
 
 // LED Configuration
 #define LED_PIN 5
@@ -12,6 +13,9 @@
 #define COLOR_ORDER GRB
 
 // Network configuration
+
+WiFiManager wifiManager;
+
 const byte DNS_PORT = 53;
 const char* AP_NAME = "LED-Clock-Setup";
 IPAddress apIP(192, 168, 4, 1);
@@ -201,6 +205,9 @@ const char* controlPage = R"rawliteral(
 
 void setup() {
     Serial.begin(115200);
+    delay(1000);  // Give serial time to initialize
+    
+    Serial.println("\nStarting LED Clock...");
     
     // Initialize EEPROM
     EEPROM.begin(sizeof(Settings));
@@ -211,19 +218,36 @@ void setup() {
     FastLED.setBrightness(settings.brightness);
     displayColor = CRGB(settings.red, settings.green, settings.blue);
     
-    // Check if WiFi is configured
-    if (!settings.configured) {
-        setupAccessPoint();
-    } else {
-        connectToWiFi();
-    }
-
-    // Setup web server routes
+    // WiFiManager setup
+    wifiManager.setAPCallback(configModeCallback);
+    wifiManager.setSaveConfigCallback(saveConfigCallback);
+    
+    // Set custom AP name
+    wifiManager.autoConnect("LED-Clock-Setup");
+    
+    // If we get here, we're connected to WiFi
+    Serial.println("Connected to WiFi");
+    
+    // Setup web server routes for the control interface
     setupWebServer();
     
     FastLED.clear();
     updateDisplay();
     FastLED.show();
+    
+    Serial.println("Setup complete");
+}
+
+void configModeCallback(WiFiManager *myWiFiManager) {
+    Serial.println("Entered config mode");
+    Serial.println(WiFi.softAPIP());
+    Serial.println(myWiFiManager->getConfigPortalSSID());
+}
+
+void saveConfigCallback() {
+    Serial.println("Configuration saved");
+    settings.configured = true;
+    saveSettings();
 }
 
 void loadSettings() {
@@ -241,12 +265,46 @@ void saveSettings() {
     EEPROM.commit();
 }
 
+
 void setupAccessPoint() {
     WiFi.mode(WIFI_AP);
     WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
     WiFi.softAP(AP_NAME);
     
+    // Debug output
+    Serial.println("Access Point Started");
+    Serial.print("AP IP address: ");
+    Serial.println(WiFi.softAPIP());
+    
+    // Set up DNS server to redirect all requests to setup page
+    dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(DNS_PORT, "*", apIP);
+    
+    // Add proper CORS headers and handle OPTIONS requests
+    webServer.enableCORS(true);  // Enable CORS for all origins
+    
+    // Handle OPTIONS requests
+    webServer.onNotFound([]() {
+        if (webServer.method() == HTTP_OPTIONS) {
+            webServer.sendHeader("Access-Control-Allow-Origin", "*");
+            webServer.sendHeader("Access-Control-Max-Age", "10000");
+            webServer.sendHeader("Access-Control-Allow-Methods", "PUT,POST,GET,OPTIONS");
+            webServer.sendHeader("Access-Control-Allow-Headers", "*");
+            webServer.send(204);
+        } else {
+            // Redirect all requests to setup page
+            webServer.sendHeader("Location", "http://192.168.4.1/", true);
+            webServer.send(302, "text/plain", "");
+        }
+    });
+
+    // Serve setup page
+    webServer.on("/", HTTP_GET, []() {
+        webServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        webServer.sendHeader("Pragma", "no-cache");
+        webServer.sendHeader("Expires", "-1");
+        webServer.send(200, "text/html", setupPage);
+    });
 }
 
 void connectToWiFi() {
@@ -564,9 +622,6 @@ void displayDigit(int position, int number) {
 }
 
 void loop() {
-    if (!settings.configured) {
-        dnsServer.processNextRequest();
-    }
     webServer.handleClient();
     
     EVERY_N_MILLISECONDS(16) {  // ~60fps update rate
