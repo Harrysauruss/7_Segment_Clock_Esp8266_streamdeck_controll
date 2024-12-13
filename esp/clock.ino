@@ -1,47 +1,31 @@
 #include <FastLED.h>
+#include <TimeLib.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
-#include <DNSServer.h>
-#include <EEPROM.h>
-#include <ArduinoJson.h>
-#include <WiFiManager.h> 
+
+// WiFi Configuration
+const char* ssid = "SSID";
+const char* password = "PASSWORD";
+
+// Web Server on port 80
+ESP8266WebServer server(80);
 
 // LED Configuration
-#define LED_PIN 5
+#define LED_PIN D6
 #define LED_COUNT 86
 #define LED_TYPE WS2812B
 #define COLOR_ORDER GRB
-
-// Network configuration
-
-WiFiManager wifiManager;
-
-const byte DNS_PORT = 53;
-const char* AP_NAME = "LED-Clock-Setup";
-IPAddress apIP(192, 168, 4, 1);
-DNSServer dnsServer;
-ESP8266WebServer webServer(80);
+#define BRIGHTNESS 255
 
 // Global variables
 CRGB leds[LED_COUNT];
-int currentHour = 12;
-int currentMinute = 45;
+int currentHour = 10;
+int currentMinute = 10;
 CRGB displayColor = CRGB::Red;
+bool autoUpdateEnabled = false;
+int secondCounter = 0;
 bool dotsOn = true;
-uint8_t brightness = 255;
 
-// EEPROM configuration
-struct Settings {
-    bool configured;
-    char ssid[32];
-    char password[64];
-    uint8_t brightness;
-    uint8_t red;
-    uint8_t green;
-    uint8_t blue;
-} settings;
-
-// Transition variables
 bool isTransitioning = false;
 unsigned long transitionStartTime = 0;
 unsigned long transitionDuration = 0;
@@ -50,478 +34,93 @@ int targetMinute = 0;
 int startHour = 0;
 int startMinute = 0;
 
+
+// Smooth sine-based easing function
+float easeInOutSine(float t) {
+    return -(cos(PI * t) - 1) / 2;
+}
+
 // Define segment patterns for 0-9
+// Segments are arranged as:
+//  AAA
+// F   B
+// F   B
+//  GGG
+// E   C
+// E   C
+//  DDD
 const bool digits[10][7] = {
-    {1, 1, 1, 1, 1, 1, 0}, // 0
-    {0, 1, 1, 0, 0, 0, 0}, // 1
-    {1, 1, 0, 1, 1, 0, 1}, // 2
-    {1, 1, 1, 1, 0, 0, 1}, // 3
-    {0, 1, 1, 0, 0, 1, 1}, // 4
-    {1, 0, 1, 1, 0, 1, 1}, // 5
-    {1, 0, 1, 1, 1, 1, 1}, // 6
-    {1, 1, 1, 0, 0, 0, 0}, // 7
-    {1, 1, 1, 1, 1, 1, 1}, // 8
-    {1, 1, 1, 1, 0, 1, 1}  // 9
+    {1, 1, 1, 1, 1, 1, 0}, // 0 (A,B,C,D,E,F)
+    {0, 1, 1, 0, 0, 0, 0}, // 1 (B,C)
+    {1, 1, 0, 1, 1, 0, 1}, // 2 (A,B,D,E,G)
+    {1, 1, 1, 1, 0, 0, 1}, // 3 (A,B,C,D,G)
+    {0, 1, 1, 0, 0, 1, 1}, // 4 (B,C,F,G)
+    {1, 0, 1, 1, 0, 1, 1}, // 5 (A,C,D,F,G)
+    {1, 0, 1, 1, 1, 1, 1}, // 6 (A,C,D,E,F,G)
+    {1, 1, 1, 0, 0, 0, 0}, // 7 (A,B,C)
+    {1, 1, 1, 1, 1, 1, 1}, // 8 (A,B,C,D,E,F,G)
+    {1, 1, 1, 1, 0, 1, 1}  // 9 (A,B,C,D,F,G)
 };
 
 // Segment to LED mapping array
+// Each segment uses 3 LEDs
 const int segmentStart[4][7] = {
-    {0, 3, 6, 9, 12, 15, 18},    // Digit 0
-    {21, 24, 27, 30, 33, 36, 39}, // Digit 1
-    {44, 47, 50, 53, 56, 59, 62}, // Digit 2
-    {65, 68, 71, 74, 77, 80, 83}  // Digit 3
+    // Digit 0 (leftmost)
+    {0, 3, 6, 9, 12, 15, 18},
+    // Digit 1
+    {21, 24, 27, 30, 33, 36, 39},
+    // Digit 2
+    {44, 47, 50, 53, 56, 59, 62},
+    // Digit 3 (rightmost)
+    {65, 68, 71, 74, 77, 80, 83}
 };
 
-// HTML templates
-const char* setupPage = R"(
-<!DOCTYPE html>
-<html>
-<head>
-    <title>LED Clock Setup</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { font-family: Arial; margin: 20px; }
-        .form-group { margin-bottom: 15px; }
-        input { width: 100%; padding: 5px; margin-top: 5px; }
-        button { background-color: #4CAF50; color: white; padding: 10px 20px; border: none; cursor: pointer; }
-    </style>
-</head>
-<body>
-    <h2>LED Clock WiFi Setup</h2>
-    <form action="/save-wifi" method="POST">
-        <div class="form-group">
-            <label>SSID:</label>
-            <input type="text" name="ssid" required>
-        </div>
-        <div class="form-group">
-            <label>Password:</label>
-            <input type="password" name="password" required>
-        </div>
-        <button type="submit">Save</button>
-    </form>
-</body>
-</html>
-)";
-
-const char* controlPage = R"rawliteral(
-<!DOCTYPE html>
-<html>
-<head>
-    <title>LED Clock Control</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { font-family: Arial; margin: 20px; }
-        .control-group { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; }
-        input { margin: 5px; }
-        button { background-color: #4CAF50; color: white; padding: 10px 20px; border: none; cursor: pointer; margin: 5px; }
-    </style>
-</head>
-<body>
-    <h2>LED Clock Control</h2>
+void handleColor() {
+    String r = server.arg("r");
+    String g = server.arg("g");
+    String b = server.arg("b");
     
-    <div class="control-group">
-        <h3>Brightness & Color</h3>
-        <input type="range" id="brightness" min="0" max="255" value="255">
-        <input type="color" id="color" value="#FF0000">
-        <button onclick="applySettings()">Apply</button>
-    </div>
+    if(r != "" && g != "" && b != "") {
+        displayColor = CRGB(r.toInt(), g.toInt(), b.toInt());
+        server.send(200, "text/plain", "Color updated");
+    } else {
+        server.send(400, "text/plain", "Missing RGB values");
+    }
+}
 
-    <div class="control-group">
-        <h3>Set Time</h3>
-        <input type="time" id="timeInput">
-        <button onclick="setTime()">Set</button>
-    </div>
-
-    <div class="control-group">
-        <h3>Transition</h3>
-        <input type="time" id="targetTime">
-        <input type="number" id="duration" placeholder="Duration (ms)" value="5000">
-        <button onclick="startTransition()">Start</button>
-    </div>
-
-    <script>
-        function updateBrightness() {
-            const brightness = document.getElementById("brightness").value;
-            fetch("/api/brightness", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({brightness: parseInt(brightness)})
-            });
-        }
-
-        function updateColor() {
-            const colorHex = document.getElementById("color").value;
-            const r = parseInt(colorHex.substr(1,2), 16);
-            const g = parseInt(colorHex.substr(3,2), 16);
-            const b = parseInt(colorHex.substr(5,2), 16);
-            fetch("/api/color", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({r, g, b})
-            });
-        }
-
-        function setTime() {
-            const time = document.getElementById("timeInput").value;
-            const [hours, minutes] = time.split(":");
-            fetch("/api/time", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({
-                    hour: parseInt(hours),
-                    minute: parseInt(minutes)
-                })
-            });
-        }
-
-        function startTransition() {
-            const time = document.getElementById("targetTime").value;
-            const [hours, minutes] = time.split(":");
-            const duration = document.getElementById("duration").value;
-            fetch("/api/transition", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({
-                    targetHour: parseInt(hours),
-                    targetMinute: parseInt(minutes),
-                    duration: parseInt(duration)
-                })
-            });
-        }
-
-        function applySettings() {
-            updateBrightness();
-            updateColor();
-        }
-
-        // Add event listeners for real-time updates
-        document.getElementById("brightness").addEventListener("change", updateBrightness);
-        document.getElementById("color").addEventListener("change", updateColor);
-    </script>
-</body>
-</html>
-)rawliteral";
-
+void handleRoot() {
+    String html = "<html><body>";
+    html += "<h1>LED Clock Control</h1>";
+    html += "<p>Current color: RGB(" + String(displayColor.r) + "," + String(displayColor.g) + "," + String(displayColor.b) + ")</p>";
+    html += "<p>Set color using: /color?r=255&g=0&b=0</p>";
+    html += "</body></html>";
+    server.send(200, "text/html", html);
+}
 
 void setup() {
     Serial.begin(115200);
-    delay(1000);  // Give serial time to initialize
+    delay(100);
     
-    Serial.println("\nStarting LED Clock...");
+    // Connect to WiFi
+    WiFi.begin(ssid, password);
+    Serial.print("Connecting to WiFi");
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println();
+    Serial.print("Connected! IP address: ");
+    Serial.println(WiFi.localIP());
     
-    // Initialize EEPROM
-    EEPROM.begin(sizeof(Settings));
-    loadSettings();
-
+    // Setup server endpoints
+    server.on("/", handleRoot);
+    server.on("/color", handleColor);
+    server.begin();
+    
     // Initialize FastLED
     FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, LED_COUNT).setCorrection(TypicalLEDStrip);
-    FastLED.setBrightness(settings.brightness);
-    displayColor = CRGB(settings.red, settings.green, settings.blue);
-    
-    // WiFiManager setup
-    wifiManager.setAPCallback(configModeCallback);
-    wifiManager.setSaveConfigCallback(saveConfigCallback);
-    
-    // Set custom AP name
-    wifiManager.autoConnect("LED-Clock-Setup");
-    
-    // If we get here, we're connected to WiFi
-    Serial.println("Connected to WiFi");
-    
-    // Setup web server routes for the control interface
-    setupWebServer();
-    
+    FastLED.setBrightness(BRIGHTNESS);
     FastLED.clear();
-    updateDisplay();
-    FastLED.show();
-    
-    Serial.println("Setup complete");
-}
-
-void configModeCallback(WiFiManager *myWiFiManager) {
-    Serial.println("Entered config mode");
-    Serial.println(WiFi.softAPIP());
-    Serial.println(myWiFiManager->getConfigPortalSSID());
-}
-
-void saveConfigCallback() {
-    Serial.println("Configuration saved");
-    settings.configured = true;
-    saveSettings();
-}
-
-void loadSettings() {
-    EEPROM.get(0, settings);
-    if (settings.brightness == 0) {
-        settings.brightness = 255;
-        settings.red = 255;
-        settings.green = 0;
-        settings.blue = 0;
-    }
-}
-
-void saveSettings() {
-    EEPROM.put(0, settings);
-    EEPROM.commit();
-}
-
-
-void setupAccessPoint() {
-    WiFi.mode(WIFI_AP);
-    WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
-    WiFi.softAP(AP_NAME);
-    
-    // Debug output
-    Serial.println("Access Point Started");
-    Serial.print("AP IP address: ");
-    Serial.println(WiFi.softAPIP());
-    
-    // Set up DNS server to redirect all requests to setup page
-    dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
-    dnsServer.start(DNS_PORT, "*", apIP);
-    
-    // Add proper CORS headers and handle OPTIONS requests
-    webServer.enableCORS(true);  // Enable CORS for all origins
-    
-    // Handle OPTIONS requests
-    webServer.onNotFound([]() {
-        if (webServer.method() == HTTP_OPTIONS) {
-            webServer.sendHeader("Access-Control-Allow-Origin", "*");
-            webServer.sendHeader("Access-Control-Max-Age", "10000");
-            webServer.sendHeader("Access-Control-Allow-Methods", "PUT,POST,GET,OPTIONS");
-            webServer.sendHeader("Access-Control-Allow-Headers", "*");
-            webServer.send(204);
-        } else {
-            // Redirect all requests to setup page
-            webServer.sendHeader("Location", "http://192.168.4.1/", true);
-            webServer.send(302, "text/plain", "");
-        }
-    });
-
-    // Serve setup page
-    webServer.on("/", HTTP_GET, []() {
-        webServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-        webServer.sendHeader("Pragma", "no-cache");
-        webServer.sendHeader("Expires", "-1");
-        webServer.send(200, "text/html", setupPage);
-    });
-}
-
-void connectToWiFi() {
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(settings.ssid, settings.password);
-    
-    int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-        delay(500);
-        attempts++;
-    }
-    
-    if (WiFi.status() != WL_CONNECTED) {
-        setupAccessPoint();
-    }
-}
-
-void setupWebServer() {
-    if (!settings.configured) {
-        webServer.on("/", HTTP_GET, []() {
-            webServer.send(200, "text/html", setupPage);
-        });
-        
-        webServer.on("/save-wifi", HTTP_POST, handleWiFiSetup);
-    } else {
-        webServer.on("/", HTTP_GET, []() {
-            webServer.send(200, "text/html", controlPage);
-        });
-        
-        // Web interface routes
-        webServer.on("/update-settings", HTTP_POST, handleSettings);
-        webServer.on("/set-time", HTTP_POST, handleTimeSet);
-        webServer.on("/transition", HTTP_POST, handleTransition);
-
-        // API routes
-        webServer.on("/api/status", HTTP_GET, handleGetStatus);
-        webServer.on("/api/settings", HTTP_GET, handleGetSettings);
-        webServer.on("/api/settings", HTTP_POST, handleApiSettings);
-        webServer.on("/api/time", HTTP_GET, handleGetTime);
-        webServer.on("/api/time", HTTP_POST, handleApiSetTime);
-        webServer.on("/api/transition", HTTP_POST, handleApiTransition);
-        webServer.on("/api/brightness", HTTP_POST, handleApiBrightness);
-        webServer.on("/api/color", HTTP_POST, handleApiColor);
-    }
-    
-    webServer.begin();
-}
-
-void handleWiFiSetup() {
-    if (webServer.hasArg("ssid") && webServer.hasArg("password")) {
-        strncpy(settings.ssid, webServer.arg("ssid").c_str(), sizeof(settings.ssid));
-        strncpy(settings.password, webServer.arg("password").c_str(), sizeof(settings.password));
-        settings.configured = true;
-        saveSettings();
-        
-        webServer.send(200, "text/plain", "WiFi settings saved. Rebooting...");
-        delay(2000);
-        ESP.restart();
-    }
-}
-
-void handleGetStatus() {
-    StaticJsonDocument<200> doc;
-    doc["configured"] = settings.configured;
-    doc["brightness"] = settings.brightness;
-    doc["color"]["r"] = settings.red;
-    doc["color"]["g"] = settings.green;
-    doc["color"]["b"] = settings.blue;
-    doc["currentHour"] = currentHour;
-    doc["currentMinute"] = currentMinute;
-    doc["isTransitioning"] = isTransitioning;
-
-    String response;
-    serializeJson(doc, response);
-    webServer.send(200, "application/json", response);
-}
-
-void handleGetSettings() {
-    StaticJsonDocument<200> doc;
-    doc["brightness"] = settings.brightness;
-    doc["color"]["r"] = settings.red;
-    doc["color"]["g"] = settings.green;
-    doc["color"]["b"] = settings.blue;
-
-    String response;
-    serializeJson(doc, response);
-    webServer.send(200, "application/json", response);
-}
-
-void handleApiSettings() {
-    if (webServer.hasArg("plain")) {
-        StaticJsonDocument<200> doc;
-        DeserializationError error = deserializeJson(doc, webServer.arg("plain"));
-        
-        if (!error) {
-            if (doc.containsKey("brightness")) {
-                settings.brightness = doc["brightness"];
-                FastLED.setBrightness(settings.brightness);
-            }
-            
-            if (doc.containsKey("color")) {
-                settings.red = doc["color"]["r"];
-                settings.green = doc["color"]["g"];
-                settings.blue = doc["color"]["b"];
-                displayColor = CRGB(settings.red, settings.green, settings.blue);
-            }
-            
-            saveSettings();
-            updateDisplay();
-            FastLED.show();
-            webServer.send(200, "application/json", "{\"status\":\"success\"}");
-        } else {
-            webServer.send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
-        }
-    }
-}
-
-void handleApiSetTime() {
-    if (webServer.hasArg("plain")) {
-        StaticJsonDocument<200> doc;
-        DeserializationError error = deserializeJson(doc, webServer.arg("plain"));
-        
-        if (!error && doc.containsKey("hour") && doc.containsKey("minute")) {
-            int hour = doc["hour"];
-            int minute = doc["minute"];
-            
-            if (hour >= 0 && hour < 24 && minute >= 0 && minute < 60) {
-                currentHour = hour;
-                currentMinute = minute;
-                updateDisplay();
-                FastLED.show();
-                webServer.send(200, "application/json", "{\"status\":\"success\"}");
-            } else {
-                webServer.send(400, "application/json", "{\"error\":\"Invalid time values\"}");
-            }
-        }
-    }
-}
-
-void handleApiTransition() {
-    if (webServer.hasArg("plain")) {
-        StaticJsonDocument<200> doc;
-        DeserializationError error = deserializeJson(doc, webServer.arg("plain"));
-        
-        if (!error && doc.containsKey("targetHour") && doc.containsKey("targetMinute") && doc.containsKey("duration")) {
-            int targetHour = doc["targetHour"];
-            int targetMinute = doc["targetMinute"];
-            unsigned long duration = doc["duration"];
-            
-            if (targetHour >= 0 && targetHour < 24 && targetMinute >= 0 && targetMinute < 60) {
-                transitionToTime(targetHour, targetMinute, duration);
-                webServer.send(200, "application/json", "{\"status\":\"success\"}");
-            } else {
-                webServer.send(400, "application/json", "{\"error\":\"Invalid time values\"}");
-            }
-        }
-    }
-}
-
-void handleApiBrightness() {
-    if (webServer.hasArg("plain")) {
-        StaticJsonDocument<50> doc;
-        DeserializationError error = deserializeJson(doc, webServer.arg("plain"));
-        
-        if (!error && doc.containsKey("brightness")) {
-            settings.brightness = doc["brightness"];
-            FastLED.setBrightness(settings.brightness);
-            saveSettings();
-            updateDisplay();
-            FastLED.show();
-            webServer.send(200, "application/json", "{\"status\":\"success\"}");
-        } else {
-            webServer.send(400, "application/json", "{\"error\":\"Invalid JSON format\"}");
-        }
-    }
-}
-
-void handleApiColor() {
-    if (webServer.hasArg("plain")) {
-        StaticJsonDocument<100> doc;
-        DeserializationError error = deserializeJson(doc, webServer.arg("plain"));
-        
-        if (!error && doc.containsKey("r") && doc.containsKey("g") && doc.containsKey("b")) {
-            settings.red = doc["r"];
-            settings.green = doc["g"];
-            settings.blue = doc["b"];
-            displayColor = CRGB(settings.red, settings.green, settings.blue);
-            saveSettings();
-            updateDisplay();
-            FastLED.show();
-            webServer.send(200, "application/json", "{\"status\":\"success\"}");
-        } else {
-            webServer.send(400, "application/json", "{\"error\":\"Invalid JSON format\"}");
-        }
-    }
-}
-
-void handleGetTime() {
-    StaticJsonDocument<100> doc;
-    doc["hour"] = currentHour;
-    doc["minute"] = currentMinute;
-
-    String response;
-    serializeJson(doc, response);
-    webServer.send(200, "application/json", response);
-}
-
-void handleSettings() {
-    handleApiSettings();
-}
-
-void handleTimeSet() {
-    handleApiSetTime();
-}
-
-void handleTransition() {
-    handleApiTransition();
 }
 
 void transitionToTime(int hour, int minute, unsigned long durationMillis) {
@@ -554,8 +153,9 @@ void updateTransition() {
         return;
     }
     
-    // Calculate progress (0.0 to 1.0)
-    float progress = (float)elapsedTime / transitionDuration;
+    // Calculate progress (0.0 to 1.0) with smooth sine easing
+    float linearProgress = (float)elapsedTime / transitionDuration;
+    float progress = easeInOutSine(linearProgress);
     
     // Convert start and target times to minutes for easier interpolation
     int startTotalMinutes = startHour * 60 + startMinute;
@@ -566,7 +166,7 @@ void updateTransition() {
         targetTotalMinutes += 24 * 60;
     }
     
-    // Calculate current total minutes
+    // Calculate current total minutes using eased progress
     int currentTotalMinutes = startTotalMinutes + ((targetTotalMinutes - startTotalMinutes) * progress);
     
     // Handle wraparound for final values
@@ -577,6 +177,40 @@ void updateTransition() {
     // Convert back to hours and minutes
     currentHour = currentTotalMinutes / 60;
     currentMinute = currentTotalMinutes % 60;
+}
+
+
+void loop() {
+    // Handle client requests
+    server.handleClient();
+    
+    EVERY_N_MILLISECONDS(16) {  // ~60fps update rate
+        if (isTransitioning) {
+            updateTransition();
+            updateDisplay();
+            FastLED.show();
+        }
+    }
+    
+    EVERY_N_SECONDS(1) {
+        if (!isTransitioning) {
+            secondCounter++;
+            dotsOn = !dotsOn;
+            if (secondCounter >= 60) {
+                secondCounter = 0;
+                currentMinute++;
+                if (currentMinute >= 60) {
+                    currentMinute = 0;
+                    currentHour++;
+                    if (currentHour >= 24) {
+                        currentHour = 0;
+                    }
+                }
+            }
+        }
+        updateDisplay();
+        FastLED.show();
+    }
 }
 
 void updateDisplay() {
@@ -617,26 +251,6 @@ void displayDigit(int position, int number) {
                     leds[ledIndex] = displayColor;
                 }
             }
-        }
-    }
-}
-
-void loop() {
-    webServer.handleClient();
-    
-    EVERY_N_MILLISECONDS(16) {  // ~60fps update rate
-        if (isTransitioning) {
-            updateTransition();
-            updateDisplay();
-            FastLED.show();
-        }
-    }
-    
-    EVERY_N_SECONDS(1) {
-        if (!isTransitioning) {
-            dotsOn = !dotsOn;
-            updateDisplay();
-            FastLED.show();
         }
     }
 }
