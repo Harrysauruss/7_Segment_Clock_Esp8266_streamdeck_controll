@@ -1,4 +1,4 @@
-import { action, KeyDownEvent, SingletonAction, WillAppearEvent, DidReceiveSettingsEvent } from "@elgato/streamdeck";
+import streamDeck, { action, KeyDownEvent, SingletonAction, WillAppearEvent, DidReceiveSettingsEvent } from "@elgato/streamdeck";
 
 type ClockSettings = {
     ipAddress?: string;
@@ -18,31 +18,31 @@ export class ClockController extends SingletonAction<ClockSettings> {
     override async onKeyDown(ev: KeyDownEvent<ClockSettings>): Promise<void> {
         const { ipAddress, color = { r: 255, g: 0, b: 0 } } = ev.payload.settings;
         
-        console.log('Settings:', { ipAddress, color });
+        streamDeck.logger.warn('Settings:', { ipAddress, color });
         
         if (!ipAddress) {
-            console.log('No IP address configured');
+            streamDeck.logger.warn('No IP address configured');
             await ev.action.showAlert();
             return;
         }
 
         try {
             const url = `http://${ipAddress}/color?r=${color.r}&g=${color.g}&b=${color.b}`;
-            console.log('Calling URL:', url);
+            streamDeck.logger.warn('Calling URL:', url);
 
             const response = await fetch(url, {
                 method: 'GET',
                 signal: AbortSignal.timeout(5000)
             });
             
-            console.log('Response status:', response.status);
-            console.log('Response headers:', Object.fromEntries(response.headers));
+            streamDeck.logger.warn('Response status:', response.status);
+            streamDeck.logger.warn('Response headers:', Object.fromEntries(response.headers));
             
             try {
                 const text = await response.text();
-                console.log('Response body:', text);
+                streamDeck.logger.warn('Response body:', text);
             } catch (e) {
-                console.log('No response body or error reading it:', e);
+                streamDeck.logger.warn('No response body or error reading it:', e);
             }
 
             if (!response.ok) {
@@ -52,7 +52,7 @@ export class ClockController extends SingletonAction<ClockSettings> {
             await ev.action.showOk();
             await this.updatePreview(ev.payload.settings);
         } catch (error) {
-            console.error('Failed to update color:', error);
+            streamDeck.logger.warn('Failed to update color:', error);
             if (error instanceof Error) {
                 console.error('Error details:', {
                     name: error.name,
