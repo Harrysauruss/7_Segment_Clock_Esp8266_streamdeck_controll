@@ -1,0 +1,9 @@
+2024-12-14T19:42:13.958Z ERROR Process encountered uncaught exception 
+Error: Failed to read manifest.json as the file does not exist.
+    at readManifest (file:///Users/mariusmeyer/tmp/7_Segment_Clock_Esp8266_streamdeck_controll/7segmentclockcontroller/com.marius.7segmentclockcontroller.sdPlugin/bin/plugin.js:6251:15)
+    at getManifest (file:///Users/mariusmeyer/tmp/7_Segment_Clock_Esp8266_streamdeck_controll/7segmentclockcontroller/com.marius.7segmentclockcontroller.sdPlugin/bin/plugin.js:6242:28)
+    at file:///Users/mariusmeyer/tmp/7_Segment_Clock_Esp8266_streamdeck_controll/7segmentclockcontroller/com.marius.7segmentclockcontroller.sdPlugin/bin/plugin.js:7326:18
+    at ModuleJob.run (node:internal/modules/esm/module_job:192:25)
+    at async DefaultModuleLoader.import (node:internal/modules/esm/loader:246:24)
+    at async loadESM (node:internal/process/esm_loader:40:7)
+    at async handleMainPromise (node:internal/modules/run_main:66:12)

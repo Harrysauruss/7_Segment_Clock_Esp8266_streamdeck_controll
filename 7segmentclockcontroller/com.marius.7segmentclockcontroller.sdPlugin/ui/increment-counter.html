@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+
+<head lang="en">
+    <title>Clock Color Settings</title>
+    <meta charset="utf-8" />
+    <script src="https://sdpi-components.dev/releases/v3/sdpi-components.js"></script>
+</head>
+
+<body>
+    <sdpi-item label="ESP8266 IP">
+        <sdpi-textfield setting="espIP" placeholder="192.168.1.100"></sdpi-textfield>
+    </sdpi-item>
+    
+    <sdpi-item label="Red">
+        <sdpi-range setting="red" min="0" max="255" step="1" default="255" showlabels></sdpi-range>
+    </sdpi-item>
+    
+    <sdpi-item label="Green">
+        <sdpi-range setting="green" min="0" max="255" step="1" default="0" showlabels></sdpi-range>
+    </sdpi-item>
+    
+    <sdpi-item label="Blue">
+        <sdpi-range setting="blue" min="0" max="255" step="1" default="0" showlabels></sdpi-range>
+    </sdpi-item>
+</body>
+
+</html>

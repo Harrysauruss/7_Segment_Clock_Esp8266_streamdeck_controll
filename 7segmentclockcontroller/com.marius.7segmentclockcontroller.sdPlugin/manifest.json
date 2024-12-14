@@ -1,29 +1,29 @@
 {
-	"Name": "7 Segment Clock Controller",
+	"Name": "7SegmentClockController",
 	"Version": "0.1.0.0",
 	"Author": "Marius",
 	"Actions": [
 		{
-			"Name": "Clock Controller",
-			"UUID": "com.marius.7-segment-esp-clock-controller.clock-control",
-			"Icon": "imgs/actions/clock/icon",
-			"Tooltip": "Controls the 7-segment clock display",
-			"PropertyInspectorPath": "ui/clock-controller.html",
+			"Name": "Clock Color",
+			"UUID": "com.marius.7segmentclockcontroller.increment",
+			"Icon": "imgs/actions/counter/icon",
+			"Tooltip": "Set the color of the 7-segment LED clock",
+			"PropertyInspectorPath": "ui/increment-counter.html",
 			"Controllers": [
 				"Keypad"
 			],
 			"States": [
 				{
-					"Image": "imgs/actions/clock/key",
+					"Image": "imgs/actions/counter/key",
 					"TitleAlignment": "middle"
 				}
 			]
 		}
 	],
-	"Category": "7 Segment Clock Controller",
+	"Category": "7SegmentClockController",
 	"CategoryIcon": "imgs/plugin/category-icon",
 	"CodePath": "bin/plugin.js",
-	"Description": "controlls a 7 segment clock via an api calling an esp8266",
+	"Description": "Controlls A esp 8266 controled 7 segment clock",
 	"Icon": "imgs/plugin/marketplace",
 	"SDKVersion": 2,
 	"Software": {
@@ -43,5 +43,5 @@
 		"Version": "20",
 		"Debug": "enabled"
 	},
-	"UUID": "com.marius.7-segment-esp-clock-controller"
+	"UUID": "com.marius.7segmentclockcontroller"
 }
