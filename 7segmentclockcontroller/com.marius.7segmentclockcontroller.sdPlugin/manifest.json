@@ -18,6 +18,38 @@
 					"TitleAlignment": "middle"
 				}
 			]
+		},
+		{
+			"Name": "Clock Transition",
+			"UUID": "com.marius.7segmentclockcontroller.transition",
+			"Icon": "imgs/actions/counter/icon",
+			"Tooltip": "Set the transition time and target time for the clock",
+			"PropertyInspectorPath": "ui/transition-control.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"States": [
+				{
+					"Image": "imgs/actions/counter/key",
+					"TitleAlignment": "middle"
+				}
+			]
+		},
+		{
+			"Name": "Set Clock Time",
+			"UUID": "com.marius.7segmentclockcontroller.settime",
+			"Icon": "imgs/actions/counter/icon",
+			"Tooltip": "Directly set the clock time",
+			"PropertyInspectorPath": "ui/set-time-control.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"States": [
+				{
+					"Image": "imgs/actions/counter/key",
+					"TitleAlignment": "middle"
+				}
+			]
 		}
 	],
 	"Category": "7SegmentClockController",

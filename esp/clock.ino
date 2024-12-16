@@ -4,8 +4,8 @@
 #include <ESP8266WebServer.h>
 
 // WiFi Configuration
-const char* ssid = "SSID";
-const char* password = "PASSWORD";
+const char* ssid = "ssid";
+const char* password = "password";
 
 // Web Server on port 80
 ESP8266WebServer server(80);
@@ -79,13 +79,42 @@ void handleColor() {
     String r = server.arg("r");
     String g = server.arg("g");
     String b = server.arg("b");
-    
+
+    Serial.println();
+    Serial.print("Ip Called");
+
     if(r != "" && g != "" && b != "") {
         displayColor = CRGB(r.toInt(), g.toInt(), b.toInt());
         server.send(200, "text/plain", "Color updated");
     } else {
         server.send(400, "text/plain", "Missing RGB values");
     }
+}
+
+void handleTransition(){
+  String h = server.arg("h");
+  String m = server.arg("m");
+  String t = server.arg("t");
+
+  if(h != "" && m != "" && t != ""){
+    transitionToTime(h.toInt(), m.toInt(), t.toInt());
+    server.send(200, "text/plain", "transition started");
+  } else{
+    server.send(400, "text/plain", "Missing values");
+  }
+}
+
+void handleSet(){
+  String h = server.arg("h");
+  String m = server.arg("m");
+
+  if(h != "" && m != ""){
+    currentHour = h.toInt();
+    currentMinute = m.toInt();
+    server.send(200, "text/plain", "set time");
+  } else{
+    server.send(400, "text/plain", "Missing values");
+  }
 }
 
 void handleRoot() {
@@ -115,6 +144,8 @@ void setup() {
     // Setup server endpoints
     server.on("/", handleRoot);
     server.on("/color", handleColor);
+    server.on("/transition", handleTransition);
+    server.on("/set", handleSet);
     server.begin();
     
     // Initialize FastLED

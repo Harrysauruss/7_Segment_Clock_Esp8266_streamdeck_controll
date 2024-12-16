@@ -62,6 +62,7 @@ export class ClockColorControl extends SingletonAction<ClockSettings> {
 		try {
 			// Make HTTP request to ESP8266
 			const response = await fetch(`http://${settings.espIP}/color?r=${r}&g=${g}&b=${b}`);
+			//const response = await fetch(`http://192.168.1.145/color?r=255&g=255&b=255`);
 			
 			if (!response.ok) {
 				throw new Error(`HTTP error! status: ${response.status}`);
