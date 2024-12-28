@@ -6,6 +6,7 @@ import {
     DidReceiveSettingsEvent 
 } from "@elgato/streamdeck";
 import streamDeck from "@elgato/streamdeck";
+import GlobalSettings from "../interfaces/GlobalSettings";
 
 /**
  * Action to directly set ESP8266 LED Clock time
@@ -71,8 +72,16 @@ export class ClockSetTimeControl extends SingletonAction<SetTimeSettings> {
      * Called when settings are updated
      */
     override async onDidReceiveSettings(ev: DidReceiveSettingsEvent<SetTimeSettings>): Promise<void> {
-        await this.updateKeyImage(ev.action);
-    }
+		// if setting espIP is not set, use global settings or if espIp is changed change in global settings
+		const globalSettings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
+		if (!ev.payload.settings.espIP) {
+			ev.payload.settings.espIP = globalSettings.espIP;
+		}
+		if (ev.payload.settings.espIP !== globalSettings.espIP) {
+			await streamDeck.settings.setGlobalSettings({ espIP: ev.payload.settings.espIP });
+		}
+		await this.updateKeyImage(ev.action);
+	}
 }
 
 /**

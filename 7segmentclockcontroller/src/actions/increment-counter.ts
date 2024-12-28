@@ -6,7 +6,7 @@ import {
 	DidReceiveSettingsEvent 
 } from "@elgato/streamdeck";
 import streamDeck from "@elgato/streamdeck";
-
+import GlobalSettings from "../interfaces/GlobalSettings";
 /**
  * Action to control ESP8266 LED Clock color
  */
@@ -36,9 +36,9 @@ export class ClockColorControl extends SingletonAction<ClockSettings> {
 	 * Called when the action appears on the Stream Deck
 	 */
 	override async onWillAppear(ev: WillAppearEvent<ClockSettings>): Promise<void> {
-		const settings = ev.payload.settings;
+		const localSettings = ev.payload.settings;
 		this.currentAction = ev.action;
-		await this.updateKeyImage(settings, ev.action);
+		await this.updateKeyImage(localSettings, ev.action);
 	}
 
 	/**
@@ -79,6 +79,14 @@ export class ClockColorControl extends SingletonAction<ClockSettings> {
 	 * Called when settings are updated
 	 */
 	override async onDidReceiveSettings(ev: DidReceiveSettingsEvent<ClockSettings>): Promise<void> {
+		// if setting espIP is not set, use global settings or if espIp is changed change in global settings
+		const globalSettings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
+		if (!ev.payload.settings.espIP) {
+			ev.payload.settings.espIP = globalSettings.espIP;
+		}
+		if (ev.payload.settings.espIP !== globalSettings.espIP) {
+			await streamDeck.settings.setGlobalSettings({ espIP: ev.payload.settings.espIP });
+		}
 		await this.updateKeyImage(ev.payload.settings, ev.action);
 	}
 }
