@@ -1,6 +1,6 @@
 {
 	"Name": "7SegmentClockController",
-	"Version": "0.1.0.0",
+	"Version": "0.1.1.0",
 	"Author": "Marius",
 	"Actions": [
 		{
@@ -41,6 +41,38 @@
 			"Icon": "imgs/actions/counter/clocks",
 			"Tooltip": "Directly set the clock time",
 			"PropertyInspectorPath": "ui/set-time-control.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"States": [
+				{
+					"Image": "imgs/actions/counter/key",
+					"TitleAlignment": "middle"
+				}
+			]
+		},
+		{
+			"Name": "Stop Clock",
+			"UUID": "com.marius.7segmentclockcontroller.stop",
+			"Icon": "imgs/actions/counter/clock",
+			"Tooltip": "Stop the clock",
+			"PropertyInspectorPath": "ui/stop-control.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"States": [
+				{
+					"Image": "imgs/actions/counter/key",
+					"TitleAlignment": "middle"
+				}
+			]
+		},
+		{
+			"Name": "Start Clock",
+			"UUID": "com.marius.7segmentclockcontroller.start",
+			"Icon": "imgs/actions/counter/clock",
+			"Tooltip": "Start the clock",
+			"PropertyInspectorPath": "ui/start-control.html",
 			"Controllers": [
 				"Keypad"
 			],
