@@ -26,6 +26,7 @@ bool autoUpdateEnabled = false;
 int secondCounter = 0;
 bool dotsOn = true;
 
+bool clockRunning = true;
 bool isTransitioning = false;
 unsigned long transitionStartTime = 0;
 unsigned long transitionDuration = 0;
@@ -117,6 +118,16 @@ void handleSet(){
   }
 }
 
+void handleStop() {
+    clockRunning = false;
+    server.send(200, "text/plain", "Clock stopped");
+}
+
+void handleStart() {
+    clockRunning = true;
+    server.send(200, "text/plain", "Clock started");
+}
+
 void handleRoot() {
     String html = "<html><body>";
     html += "<h1>LED Clock Control</h1>";
@@ -146,6 +157,8 @@ void setup() {
     server.on("/color", handleColor);
     server.on("/transition", handleTransition);
     server.on("/set", handleSet);
+    server.on("/stop", handleStop);
+    server.on("/start", handleStart);
     server.begin();
     
     // Initialize FastLED
@@ -224,7 +237,7 @@ void loop() {
     }
     
     EVERY_N_SECONDS(1) {
-        if (!isTransitioning) {
+        if (!isTransitioning && clockRunning) {
             secondCounter++;
             dotsOn = !dotsOn;
             if (secondCounter >= 60) {
@@ -247,7 +260,9 @@ void loop() {
 void updateDisplay() {
     FastLED.clear();
     
-    displayDigit(0, currentHour / 10);
+    if (currentHour >= 10) {
+        displayDigit(0, currentHour / 10);
+    }
     displayDigit(1, currentHour % 10);
     
     displayDigit(2, currentMinute / 10);
