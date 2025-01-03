@@ -78,9 +78,6 @@ export class ClockTransitionControl extends SingletonAction<TransitionSettings> 
      */
     override async onDidReceiveSettings(ev: DidReceiveSettingsEvent<TransitionSettings>): Promise<void> {
 		const globalSettings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
-		if (!ev.payload.settings.espIP) {
-			ev.payload.settings.espIP = globalSettings.espIP;
-		}
 		if (ev.payload.settings.espIP !== globalSettings.espIP) {
 			await streamDeck.settings.setGlobalSettings({ espIP: ev.payload.settings.espIP });
 		}

@@ -81,9 +81,6 @@ export class ClockColorControl extends SingletonAction<ClockSettings> {
 	override async onDidReceiveSettings(ev: DidReceiveSettingsEvent<ClockSettings>): Promise<void> {
 		// if setting espIP is not set, use global settings or if espIp is changed change in global settings
 		const globalSettings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
-		if (!ev.payload.settings.espIP) {
-			ev.payload.settings.espIP = globalSettings.espIP;
-		}
 		if (ev.payload.settings.espIP !== globalSettings.espIP) {
 			await streamDeck.settings.setGlobalSettings({ espIP: ev.payload.settings.espIP });
 		}
