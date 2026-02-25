@@ -8,18 +8,21 @@
 </head>
 
 <body>
-    <sdpi-item label="ESP8266 IP">
+    <sdpi-item label="Global IP">
+        <sdpi-textfield setting="globalEspIP" placeholder="192.168.1.100" global></sdpi-textfield>
+    </sdpi-item>
+    <sdpi-item label="Override IP">
         <sdpi-textfield setting="espIP" placeholder="192.168.1.100"></sdpi-textfield>
     </sdpi-item>
-    
+
     <sdpi-item label="Red">
         <sdpi-range setting="red" min="0" max="255" step="1" default="255" showlabels></sdpi-range>
     </sdpi-item>
-    
+
     <sdpi-item label="Green">
         <sdpi-range setting="green" min="0" max="255" step="1" default="0" showlabels></sdpi-range>
     </sdpi-item>
-    
+
     <sdpi-item label="Blue">
         <sdpi-range setting="blue" min="0" max="255" step="1" default="0" showlabels></sdpi-range>
     </sdpi-item>

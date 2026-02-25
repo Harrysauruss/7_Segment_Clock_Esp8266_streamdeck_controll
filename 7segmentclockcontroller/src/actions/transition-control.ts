@@ -3,21 +3,25 @@ import {
     KeyDownEvent, 
     SingletonAction, 
     WillAppearEvent,
-    DidReceiveSettingsEvent 
+    DidReceiveSettingsEvent,
+    KeyAction,
+    DialAction
 } from "@elgato/streamdeck";
 import streamDeck from "@elgato/streamdeck";
 
 /**
  * Action to control ESP8266 LED Clock transition
  */
+import { ActionSettings, GlobalSettings, getTargetIP } from "../settings";
+
 @action({ UUID: "com.marius.7segmentclockcontroller.transition" })
 export class ClockTransitionControl extends SingletonAction<TransitionSettings> {
-    private currentAction?: StreamDeckAction;
+    private currentAction?: KeyAction<any> | DialAction<any>;
 
     /**
      * Updates the key's image with a transition icon
      */
-    private async updateKeyImage(settings: TransitionSettings, action: StreamDeckAction): Promise<void> {
+    private async updateKeyImage(settings: TransitionSettings, action: KeyAction<any> | DialAction<any>): Promise<void> {
         // Create an SVG transition icon
         const svg = `<svg width="144" height="144" viewBox="0 0 144 144">
             <circle cx="72" cy="72" r="60" fill="none" stroke="rgb(200,200,200)" stroke-width="8"/>
@@ -42,11 +46,13 @@ export class ClockTransitionControl extends SingletonAction<TransitionSettings> 
      */
     override async onKeyDown(ev: KeyDownEvent<TransitionSettings>): Promise<void> {
         const settings = ev.payload.settings;
+        const globalSettings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
+        const targetIP = getTargetIP(settings, globalSettings);
         
         // Validate IP address
-        if (!settings.espIP) {
+        if (!targetIP) {
             await ev.action.showAlert();
-            streamDeck.logger.error('ESP8266 IP address not configured');
+            streamDeck.logger.error('ESP8266 IP address not configured (neither global nor override)');
             return;
         }
 
@@ -58,7 +64,7 @@ export class ClockTransitionControl extends SingletonAction<TransitionSettings> 
         try {
             // Make HTTP request to ESP8266
             const response = await fetch(
-                `http://${settings.espIP}/transition?h=${hours}&m=${minutes}&t=${transitionTime}`
+                `http://${targetIP}/transition?h=${hours}&m=${minutes}&t=${transitionTime}`
             );
             
             if (!response.ok) {

@@ -3,21 +3,25 @@ import {
 	KeyDownEvent, 
 	SingletonAction, 
 	WillAppearEvent,
-	DidReceiveSettingsEvent 
+	DidReceiveSettingsEvent,
+    KeyAction,
+    DialAction
 } from "@elgato/streamdeck";
 import streamDeck from "@elgato/streamdeck";
 
 /**
  * Action to control ESP8266 LED Clock color
  */
+import { ActionSettings, GlobalSettings, getTargetIP } from "../settings";
+
 @action({ UUID: "com.marius.7segmentclockcontroller.increment" })
 export class ClockColorControl extends SingletonAction<ClockSettings> {
-	private currentAction?: StreamDeckAction;
+	private currentAction?: KeyAction<any> | DialAction<any>;
 
 	/**
 	 * Updates the key's image with a clock icon in the selected color
 	 */
-	private async updateKeyImage(settings: ClockSettings, action: StreamDeckAction): Promise<void> {
+	private async updateKeyImage(settings: ClockSettings, action: KeyAction<any> | DialAction<any>): Promise<void> {
 		const r = settings.red ?? 255;
 		const g = settings.green ?? 0;
 		const b = settings.blue ?? 0;
@@ -46,11 +50,13 @@ export class ClockColorControl extends SingletonAction<ClockSettings> {
 	 */
 	override async onKeyDown(ev: KeyDownEvent<ClockSettings>): Promise<void> {
 		const settings = ev.payload.settings;
+		const globalSettings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
+		const targetIP = getTargetIP(settings, globalSettings);
 		
 		// Validate IP address
-		if (!settings.espIP) {
+		if (!targetIP) {
 			await ev.action.showAlert();
-			streamDeck.logger.error('ESP8266 IP address not configured');
+			streamDeck.logger.error('ESP8266 IP address not configured (neither global nor override)');
 			return;
 		}
 
@@ -61,7 +67,7 @@ export class ClockColorControl extends SingletonAction<ClockSettings> {
 
 		try {
 			// Make HTTP request to ESP8266
-			const response = await fetch(`http://${settings.espIP}/color?r=${r}&g=${g}&b=${b}`);
+			const response = await fetch(`http://${targetIP}/color?r=${r}&g=${g}&b=${b}`);
 			//const response = await fetch(`http://192.168.1.145/color?r=255&g=255&b=255`);
 			
 			if (!response.ok) {
@@ -86,8 +92,7 @@ export class ClockColorControl extends SingletonAction<ClockSettings> {
 /**
  * Settings for ClockColorControl
  */
-type ClockSettings = {
-	espIP?: string;
+type ClockSettings = ActionSettings & {
 	red?: number;
 	green?: number;
 	blue?: number;
