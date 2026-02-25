@@ -4,19 +4,22 @@ import {
     SingletonAction, 
     WillAppearEvent,
     DidReceiveSettingsEvent,
-    StreamDeckAction 
+    KeyAction,
+    DialAction
 } from "@elgato/streamdeck";
 import streamDeck from "@elgato/streamdeck";
 
 /**
  * Action to stop the ESP8266 LED Clock
  */
+import { ActionSettings, GlobalSettings, getTargetIP } from "../settings";
+
 @action({ UUID: "com.marius.7segmentclockcontroller.stop" })
 export class ClockStopControl extends SingletonAction<StopSettings> {
     /**
      * Updates the key's image with a stop icon
      */
-    private async updateKeyImage(action: StreamDeckAction): Promise<void> {
+    private async updateKeyImage(action: KeyAction<any> | DialAction<any>): Promise<void> {
         // Create an SVG stop icon (square)
         const svg = `<svg width="144" height="144" viewBox="0 0 144 144">
             <rect x="42" y="42" width="60" height="60" fill="rgb(255,50,50)"/>
@@ -37,17 +40,19 @@ export class ClockStopControl extends SingletonAction<StopSettings> {
      */
     override async onKeyDown(ev: KeyDownEvent<StopSettings>): Promise<void> {
         const settings = ev.payload.settings;
+        const globalSettings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
+        const targetIP = getTargetIP(settings, globalSettings);
         
         // Validate IP address
-        if (!settings.espIP) {
+        if (!targetIP) {
             await ev.action.showAlert();
-            streamDeck.logger.error('ESP8266 IP address not configured');
+            streamDeck.logger.error('ESP8266 IP address not configured (neither global nor override)');
             return;
         }
 
         try {
             // Make HTTP request to ESP8266
-            const response = await fetch(`http://${settings.espIP}/stop`);
+            const response = await fetch(`http://${targetIP}/stop`);
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -71,6 +76,4 @@ export class ClockStopControl extends SingletonAction<StopSettings> {
 /**
  * Settings for ClockStopControl
  */
-type StopSettings = {
-    espIP?: string;
-};
+type StopSettings = ActionSettings & {};

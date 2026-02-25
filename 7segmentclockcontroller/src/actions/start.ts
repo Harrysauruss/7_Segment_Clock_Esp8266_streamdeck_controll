@@ -4,19 +4,22 @@ import {
     SingletonAction, 
     WillAppearEvent,
     DidReceiveSettingsEvent,
-    StreamDeckAction 
+    KeyAction,
+    DialAction
 } from "@elgato/streamdeck";
 import streamDeck from "@elgato/streamdeck";
 
 /**
  * Action to start the ESP8266 LED Clock
  */
+import { ActionSettings, GlobalSettings, getTargetIP } from "../settings";
+
 @action({ UUID: "com.marius.7segmentclockcontroller.start" })
 export class ClockStartControl extends SingletonAction<StartSettings> {
     /**
      * Updates the key's image with a play icon
      */
-    private async updateKeyImage(action: StreamDeckAction): Promise<void> {
+    private async updateKeyImage(action: KeyAction<any> | DialAction<any>): Promise<void> {
         // Create an SVG play icon (triangle)
         const svg = `<svg width="144" height="144" viewBox="0 0 144 144">
             <polygon points="42,32 112,72 42,112" fill="rgb(50,255,50)"/>
@@ -37,17 +40,19 @@ export class ClockStartControl extends SingletonAction<StartSettings> {
      */
     override async onKeyDown(ev: KeyDownEvent<StartSettings>): Promise<void> {
         const settings = ev.payload.settings;
+        const globalSettings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
+        const targetIP = getTargetIP(settings, globalSettings);
         
         // Validate IP address
-        if (!settings.espIP) {
+        if (!targetIP) {
             await ev.action.showAlert();
-            streamDeck.logger.error('ESP8266 IP address not configured');
+            streamDeck.logger.error('ESP8266 IP address not configured (neither global nor override)');
             return;
         }
 
         try {
             // Make HTTP request to ESP8266
-            const response = await fetch(`http://${settings.espIP}/start`);
+            const response = await fetch(`http://${targetIP}/start`);
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -71,6 +76,4 @@ export class ClockStartControl extends SingletonAction<StartSettings> {
 /**
  * Settings for ClockStartControl
  */
-type StartSettings = {
-    espIP?: string;
-};
+type StartSettings = ActionSettings & {};

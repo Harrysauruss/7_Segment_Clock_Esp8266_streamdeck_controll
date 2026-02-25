@@ -3,19 +3,23 @@ import {
     KeyDownEvent, 
     SingletonAction, 
     WillAppearEvent,
-    DidReceiveSettingsEvent 
+    DidReceiveSettingsEvent,
+    KeyAction,
+    DialAction
 } from "@elgato/streamdeck";
 import streamDeck from "@elgato/streamdeck";
 
 /**
  * Action to directly set ESP8266 LED Clock time
  */
+import { ActionSettings, GlobalSettings, getTargetIP } from "../settings";
+
 @action({ UUID: "com.marius.7segmentclockcontroller.settime" })
 export class ClockSetTimeControl extends SingletonAction<SetTimeSettings> {
     /**
      * Updates the key's image with a clock icon
      */
-    private async updateKeyImage(action: StreamDeckAction): Promise<void> {
+    private async updateKeyImage(action: KeyAction<any> | DialAction<any>): Promise<void> {
         // Create an SVG clock icon
         const svg = `<svg width="144" height="144" viewBox="0 0 144 144">
             <circle cx="72" cy="72" r="60" fill="none" stroke="rgb(200,200,200)" stroke-width="8"/>
@@ -38,11 +42,13 @@ export class ClockSetTimeControl extends SingletonAction<SetTimeSettings> {
      */
     override async onKeyDown(ev: KeyDownEvent<SetTimeSettings>): Promise<void> {
         const settings = ev.payload.settings;
+        const globalSettings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
+        const targetIP = getTargetIP(settings, globalSettings);
         
         // Validate IP address
-        if (!settings.espIP) {
+        if (!targetIP) {
             await ev.action.showAlert();
-            streamDeck.logger.error('ESP8266 IP address not configured');
+            streamDeck.logger.error('ESP8266 IP address not configured (neither global nor override)');
             return;
         }
 
@@ -53,7 +59,7 @@ export class ClockSetTimeControl extends SingletonAction<SetTimeSettings> {
         try {
             // Make HTTP request to ESP8266
             const response = await fetch(
-                `http://${settings.espIP}/set?h=${hours}&m=${minutes}`
+                `http://${targetIP}/set?h=${hours}&m=${minutes}`
             );
             
             if (!response.ok) {
